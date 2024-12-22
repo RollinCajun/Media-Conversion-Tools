@@ -1,11 +1,3 @@
-"""
-Author: RollinCajun
-Email: kastingwithfrostbyte@proton.me
-
-Description:
-This module handles video processing using ffmpeg and ffprobe.
-"""
-
 import os
 import subprocess
 from send2trash import send2trash
@@ -61,9 +53,9 @@ class VideoWorkerThread(QThread):
         for i, file_path in enumerate(files_to_process):
             if self.stop_event:
                 break  # Stop processing if stop event is set
-            self.update_status_bar.emit(f"Processing {file_path}")
 
             if not self.is_h265(file_path):
+                self.update_status_bar.emit(f"Processing {file_path}")
                 self.update_status_bar.emit(f"Converting {file_path} to H.265...")
                 try:
                     self.convert_to_h265(file_path, use_gpu)  # Convert the video to H.265
