@@ -1,3 +1,11 @@
+"""
+Author: RollinCajun
+Email: kastingwithfrostbyte@proton.me
+
+Description:
+This module contains the GUI widgets for image and video processing using PySide6.
+"""
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QFileDialog, QTextEdit, QCheckBox, 
                                QProgressBar, QMessageBox, QStatusBar)
@@ -18,7 +26,7 @@ class ImageProcessingWidget(QWidget):
         # Directory input
         dir_layout = QHBoxLayout()
         dir_label = QLabel("Directory Path:")
-        self.dir_input = QLineEdit()
+        self.dir_input = QLineEdit("D:\\ffmpeg Conversion Folder")  # Set default folder path
         browse_button = QPushButton("Browse")
         browse_button.clicked.connect(lambda: browse_directory(self.dir_input))
         dir_layout.addWidget(dir_label)
@@ -66,20 +74,25 @@ class ImageProcessingWidget(QWidget):
         self.setLayout(layout)
 
     def update_status(self, message):
+        # Append message to the log text box and scroll to the end
         self.log_text.append(message)
         self.log_text.moveCursor(QTextCursor.End)
 
     def update_status_bar(self, message):
+        # Show message in the status bar
         self.status_bar.showMessage(message)
 
     def update_progress(self, value):
+        # Update the progress bar value
         self.progress_bar.setValue(value)
 
     def update_photo_counts(self, total, remaining):
+        # Update the total and remaining photo counts
         self.total_photos_label.setText(f"Total Photos: {total}")
         self.remaining_photos_label.setText(f"Remaining Photos: {remaining}")
 
     def on_finished(self):
+        # Show completion message in the status bar
         self.status_bar.showMessage("Operation completed.")
 
 class VideoProcessingWidget(QWidget):
@@ -94,7 +107,7 @@ class VideoProcessingWidget(QWidget):
         # Directory input
         dir_layout = QHBoxLayout()
         dir_label = QLabel("Directory Path:")
-        self.dir_input = QLineEdit()
+        self.dir_input = QLineEdit("D:\\ffmpeg Conversion Folder")  # Set default folder path
         browse_button = QPushButton("Browse")
         browse_button.clicked.connect(lambda: browse_directory(self.dir_input))
         dir_layout.addWidget(dir_label)
@@ -142,22 +155,28 @@ class VideoProcessingWidget(QWidget):
         self.setLayout(layout)
 
     def update_status(self, message):
+        # Append message to the log text box and scroll to the end
         self.log_text.append(message)
         self.log_text.moveCursor(QTextCursor.End)
 
     def update_status_bar(self, message):
+        # Show message in the status bar
         self.status_bar.showMessage(message)
 
     def update_ffmpeg_output(self, message):
+        # Append ffmpeg output message to the ffmpeg log text box and scroll to the end
         self.ffmpeg_output_text.append(message)
         self.ffmpeg_output_text.moveCursor(QTextCursor.End)
 
     def update_progress(self, value):
+        # Update the progress bar value
         self.progress_bar.setValue(value)
 
     def update_video_counts(self, total, remaining):
+        # Update the total and remaining video counts
         self.total_videos_label.setText(f"Total Videos: {total}")
         self.remaining_videos_label.setText(f"Remaining Videos: {remaining}")
 
     def on_finished(self):
+        # Show completion message in the status bar
         self.status_bar.showMessage("Operation completed.")
