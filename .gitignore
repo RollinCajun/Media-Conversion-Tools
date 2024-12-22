@@ -1,0 +1,8 @@
+# IDE and Editor files
+.vscode/*
+
+# Media Conversion Tools.code-workspace
+Media Conversion Tools.code-workspace
+
+# Compiled Python files
+__pycache__/*
