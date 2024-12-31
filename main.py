@@ -42,7 +42,10 @@ class MainWindow(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setStyle("Fusion")  # Set the Fusion style
+    # Set the Fusion style 3 styles available are. Fusion, Windows, WindowsVista
+    # the Fusion and Windows both use dark mode according to windows being set to dark mode by default
+    # these two themes will swap when you switch from dark mode to light mode in windows 10-11 itself
+    app.setStyle("Fusion")
     icon_path = os.path.join(os.path.dirname(__file__), "resources", "defaultIcon.ico")
     app.setWindowIcon(QIcon(icon_path))
     window = MainWindow()

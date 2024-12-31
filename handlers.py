@@ -82,6 +82,15 @@ def start_video_processing(widget):
     """
     directory = sanitize_path(widget.dir_input.text())  # Sanitize the directory path
     use_gpu = widget.use_gpu_checkbox.isChecked()  # Check if GPU should be used
+    use_handbrake = widget.use_handbrake_checkbox.isChecked()  # Check if HandBrakeCLI should be used
+    use_amd = widget.use_amd_checkbox.isChecked()  # Check if AMD should be used
+
+    if use_amd and not use_gpu:
+        message = "AMD encoding requires GPU encoding to be enabled."
+        QMessageBox.warning(widget, "Invalid Configuration", message)
+        widget.update_status(message)
+        return
+
     if not os.path.isdir(directory):
         QMessageBox.warning(widget, "Invalid Directory", "Please enter a valid directory path.")
         return
@@ -91,7 +100,7 @@ def start_video_processing(widget):
     widget.update_video_counts(total_videos, total_videos)  # Update the video counts
 
     # Initialize and start the video worker thread
-    widget.worker_thread = VideoWorkerThread(directory, use_gpu)
+    widget.worker_thread = VideoWorkerThread(directory, use_gpu, use_handbrake, use_amd)
     widget.worker_thread.update_status.connect(widget.update_status)
     widget.worker_thread.update_status_bar.connect(widget.update_status_bar)
     widget.worker_thread.update_ffmpeg_output.connect(widget.update_ffmpeg_output)

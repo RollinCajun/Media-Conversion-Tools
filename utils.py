@@ -12,6 +12,9 @@ import shutil
 from PIL import Image
 import subprocess
 
+# Variable to store the comment added to image metadata
+COMMENT = "ConvertedByFrostbyte"
+
 def sanitize_path(path):
     """
     Sanitize the given path by normalizing and converting it to an absolute path.
@@ -27,7 +30,7 @@ def convert_single_image(file_path):
         if file_path.lower().endswith(('.jpeg', '.png', '.gif', '.tiff', '.bmp', '.jpg')):
             # Check if the image already has the comment
             result = subprocess.run(['exiftool', '-XPComment', file_path], capture_output=True, text=True, check=True)
-            if "ConvertedByFrostbyte" in result.stdout:
+            if COMMENT in result.stdout:
                 return f"Skipping {file_path}, comment found."
             # Open the image and convert it to JPG format
             with Image.open(file_path) as img:
@@ -35,7 +38,7 @@ def convert_single_image(file_path):
                 img.convert("RGB").save(output_file, "JPEG")
                 print(f"Created tmp file: {output_file}")  # Debugging line
             # Add the comment to the metadata
-            subprocess.run(['exiftool', '-overwrite_original', '-XPComment=ConvertedByFrostbyte', output_file], check=True)
+            subprocess.run(['exiftool', '-overwrite_original', f'-XPComment={COMMENT}', output_file], check=True)
             return output_file
     except Exception as e:
         return f"Error processing {file_path}: {e}"
