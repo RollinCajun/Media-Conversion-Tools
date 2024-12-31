@@ -24,7 +24,7 @@ After downloading a big OF collection, I used up too much space on my hard drive
 ## Dependencies
 
 ### Included Dependencies
-The following dependencies are included in the `resources` folder:
+The following Windows binary dependencies are included in the `resources` folder:
 - `ffmpeg` - version 7.1 Essentials (You can replace these with your own from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
 - `ffprobe` - version 7.1 Essentials (You can replace these with your own from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
 - `HandBrakeCLI` - version 1.9.0 (You can replace these with your own from [handbrake.fr](https://handbrake.fr/downloads2.php))
@@ -44,18 +44,7 @@ The application requires the following Python libraries:
      3. In the Environment Variables window, find the "Path" variable in the "System variables" section and select it. Click "Edit".
      4. Click "New" and add the path to your Python installation directory (e.g., `C:\Python39` or `C:\Users\YourUsername\AppData\Local\Programs\Python\Python39`).
      5. Click "OK" to close all windows.
-   - **macOS/Linux:**
-     1. Open a terminal window.
-     2. Open the profile file in a text editor (e.g., `nano ~/.bash_profile` or `nano ~/.zshrc`).
-     3. Add the following line to the file:
-        ```sh
-        export PATH="/path/to/python:$PATH"
-        ```
-     4. Save the file and close the text editor.
-     5. Run the following command to apply the changes:
-        ```sh
-        source ~/.bash_profile
-        ```
+
 3. **Install required libraries using `pip`:**
    ```bash
    pip install -r requirements.txt
@@ -155,7 +144,7 @@ Contributions are welcome! Please feel free to fork this repository and submit p
 
 ## Disclaimer
 
-**Disclaimer:** I am not responsible for any files deleted by this code. All video and image folders should be backed up before testing this application extensively. Ensure you have backups of your data before running the application on important folders. I have tested all parts of this application except the AMD GPU encoding as I do not own an AMD GPU to test it. All other parts have been tested extensively, including converting over 1,000 H.264, Quicktime, and AVI videos to H.265, as well as converting over 40,000 image files from BMP, JPG, JPEG, PNG, etc., to JPG.
+**Disclaimer:** I am not responsible for any files deleted by this code. All video and image folders should be backed up before testing this application extensively. Ensure you have backups of your data before running the application on important folders. I have tested all parts of this application except the AMD GPU encoding as I do not own an AMD GPU to test it. All other parts have been tested extensively, including converting over 1,000 H.264, Quicktime, and AVI videos to H.265, as well as converting over 40,000 image files from BMP, JPG, JPEG, PNG, etc., to JPG. THIS APPLICATION WAS CREATED FOR WINDOWS PCs. IF YOU WANT TO USE IT ON LINUX SOME CHANGES WILL HAVE TO BE MADE. CODE CHANGES AND NECESSARY DEPENDENCIES WILL BE REQUIRED. I HAVE NO DESIRE TO MAKE A LINUX VERSION OF THIS BECAUSE I DON'T USE LINUX. IF SOMEONE WANTS TO FORK IT AND SET IT UP FOR LINUX THEY ARE WELCOME TO DO SO.
 
 ## License
 
