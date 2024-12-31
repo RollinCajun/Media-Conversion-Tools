@@ -2,7 +2,12 @@
 
 ## Overview
 
-The Media Conversion Tools application provides a user-friendly interface for converting videos to H.265 format and images to JPEG format, helping to save space on your hard drive. The application supports the following features:
+Media Conversion Tools: A GUI application for efficient media file conversion
+
+This application provides a user-friendly interface for:
+
+    Video Conversion: Converts various video formats (e.g., MP4, AVI, MKV) to the highly efficient H.265 format using ffmpeg or Handbrake CLI.
+    Image Optimization: Converts images to the JPEG format, helping to reduce file size and save disk space.
 
 ### Video Conversion
 - Scans specified folders and subfolders recursively.
