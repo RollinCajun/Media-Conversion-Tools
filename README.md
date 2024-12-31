@@ -2,27 +2,32 @@
 
 ## Overview
 
-The Media Conversion Tools application provides a user-friendly interface for converting videos and images, as well as removing metadata from images. The application supports the following features:
+The Media Conversion Tools application provides a user-friendly interface for converting videos to H.265 format and images to JPEG format, helping to save space on your hard drive. The application supports the following features:
 
 ### Video Conversion
 - Scans specified folders and subfolders recursively.
-- Converts all video files found to the H.265 format using the MP4 container.
+- Converts all video files found from any format to the H.265 format using the MP4 container.
 - Supports GPU encoding (NVIDIA and AMD) and CPU encoding.
 - Allows the use of HandBrakeCLI or ffmpeg for video conversion.
 
 ### Image Conversion & Metadata Removal
 - Scans specified folders and subfolders recursively.
 - Converts all image files to the JPEG format.
-- Adds a custom comment to the metadata of converted images.
+- Adds a custom comment to the metadata of converted images to keep track of files already converted, allowing you to stop and resume the application as needed. After converting all image files you can use the Remove Metadata button to clear the comment off all files.
 - Removes metadata from the "Description" section of the image files.
+
+## Files are sent to the recycling bin mainly for debugging purposes while creating this application to insure I didn't lose anything important. This part of the code could be changed to permenantly delete the files if you wish. Using the recylcing bin was the safest method while creating this application. If you decide to delete the files permenantly you can remove the Import send2trash library from the application altogether.
+
+## Inspiration for creating this Application
+After downloading a big OF collection, I used up too much space on my hard drive, so I needed a way to save space without deleting anything. By converting videos to H.265 and images to JPEG I reduced the space taken by almost one half. For example, a 500 MB video file can be reduced to around 200-250 MB. This application helped reduce over 1 TB of data to 558 GB, saving over 400 GB of storage space. H.265 has become extremely popular and is by far the best compressed video format that still holds extremely good details without losing much quality.
 
 ## Dependencies
 
 ### Included Dependencies
 The following dependencies are included in the `resources` folder:
-- `ffmpeg` - version 7.1 Essentials
-- `ffprobe` - version 7.1 Essentials
-- `HandBrakeCLI` - version 1.9.0
+- `ffmpeg` - version 7.1 Essentials (You can replace these with your own from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
+- `ffprobe` - version 7.1 Essentials (You can replace these with your own from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
+- `HandBrakeCLI` - version 1.9.0 (You can replace these with your own from [handbrake.fr](https://handbrake.fr/downloads2.php))
 
 ### Required Python Libraries
 The application requires the following Python libraries:
@@ -150,7 +155,7 @@ Contributions are welcome! Please feel free to fork this repository and submit p
 
 ## Disclaimer
 
-**Disclaimer:** I am not responsible for any files deleted by this code. All video and image folders should be backed up before testing this application extensively. Ensure you have backups of your data before running the application on important folders.
+**Disclaimer:** I am not responsible for any files deleted by this code. All video and image folders should be backed up before testing this application extensively. Ensure you have backups of your data before running the application on important folders. I have tested all parts of this application except the AMD GPU encoding as I do not own an AMD GPU to test it. All other parts have been tested extensively, including converting over 1,000 H.264, Quicktime, and AVI videos to H.265, as well as converting over 40,000 image files from BMP, JPG, JPEG, PNG, etc., to JPG.
 
 ## License
 
