@@ -43,7 +43,7 @@ class ImageWorkerThread(QThread):
     def convert_to_jpg(self, directory, use_max_cores):
         start_time = time.time()  # Record start time
         # Collect all image files in the directory and subdirectories
-        files_to_process = [os.path.join(root, file) for root, _, files in os.walk(directory) for file in files if file.lower().endswith(('.jpeg', '.png', '.gif', '.tiff', '.bmp', '.jpg'))]
+        files_to_process = [os.path.join(root, file) for root, _, files in os.walk(directory) for file in files if file.lower().endswith(('.jpeg', '.png', '.gif', '.tiff', '.bmp', '.jpg', '.heic'))]
         total_files = len(files_to_process)  # Total number of files to process
         max_workers = os.cpu_count() if use_max_cores else 2  # Determine number of workers
 

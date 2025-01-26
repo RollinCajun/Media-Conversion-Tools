@@ -96,7 +96,7 @@ class VideoWorkerThread(QThread):
         try:
             result = subprocess.run(
                 [self.ffprobe_path, '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'default=nw=1:nk=1', file_path],
-                capture_output=True, text=True, check=True
+                capture_output=True, text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW
             )
             return 'hevc' in result.stdout
         except FileNotFoundError as e:

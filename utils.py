@@ -11,6 +11,10 @@ import os
 import shutil
 from PIL import Image
 import subprocess
+import pillow_heif
+
+# Register HEIF format with Pillow
+pillow_heif.register_heif_opener()
 
 # Variable to store the comment added to image metadata
 COMMENT = "ConvertedByFrostbyte"
@@ -27,9 +31,9 @@ def convert_single_image(file_path):
     If the image already has the comment, it will be skipped.
     """
     try:
-        if file_path.lower().endswith(('.jpeg', '.png', '.gif', '.tiff', '.bmp', '.jpg')):
+        if file_path.lower().endswith(('.jpeg', '.png', '.gif', '.tiff', '.bmp', '.jpg', '.heic')):
             # Check if the image already has the comment
-            result = subprocess.run(['exiftool', '-XPComment', file_path], capture_output=True, text=True, check=True)
+            result = subprocess.run(['exiftool', '-XPComment', file_path], capture_output=True, text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
             if COMMENT in result.stdout:
                 return f"Skipping {file_path}, comment found."
             # Open the image and convert it to JPG format
@@ -38,9 +42,10 @@ def convert_single_image(file_path):
                 img.convert("RGB").save(output_file, "JPEG")
                 print(f"Created tmp file: {output_file}")  # Debugging line
             # Add the comment to the metadata
-            subprocess.run(['exiftool', '-overwrite_original', f'-XPComment={COMMENT}', output_file], check=True)
+            subprocess.run(['exiftool', '-overwrite_original', f'-XPComment={COMMENT}', output_file], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
             return output_file
     except Exception as e:
+        print(f"Error processing {file_path}: {e}")  # Debugging line
         return f"Error processing {file_path}: {e}"
     return None
 
@@ -51,7 +56,7 @@ def remove_single_metadata(file_path):
     try:
         subprocess.run(
             ['exiftool', '-overwrite_original', '-XPComment=', '-XPSubject=', '-XMP-dc:Subject=', '-XMP-dc:Title=', '-XMP-dc:Description=', '-XMP-microsoft:LastKeywordXMP=', '-Comment=', file_path],
-            check=True
+            check=True, creationflags=subprocess.CREATE_NO_WINDOW
         )
         return f"Removed metadata from {file_path}"
     except subprocess.CalledProcessError as e:
