@@ -11,7 +11,7 @@ import os
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 from photo_converting import ImageWorkerThread
 from video_converting import VideoWorkerThread
-from utils import sanitize_path
+from utils import sanitize_path, is_supported_image_file
 
 def browse_directory(dir_input):
     """
@@ -31,12 +31,14 @@ def start_image_conversion(widget):
         QMessageBox.warning(widget, "Invalid Directory", "Please enter a valid directory path.")
         return
 
+    target_format = widget.format_selector.currentText() if hasattr(widget, 'format_selector') else 'JPG'
+
     # Count the total number of image files
-    total_photos = sum([len(files) for r, d, files in os.walk(directory) if any(file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif')) for file in files)])
+    total_photos = sum([len(files) for r, d, files in os.walk(directory) if any(is_supported_image_file(file) for file in files)])
     widget.update_photo_counts(total_photos, total_photos)  # Update the photo counts
 
     # Initialize and start the image worker thread
-    widget.worker_thread = ImageWorkerThread(directory, use_max_cores, 'convert')
+    widget.worker_thread = ImageWorkerThread(directory, use_max_cores, 'convert', target_format)
     widget.worker_thread.update_status.connect(widget.update_status)
     widget.worker_thread.update_status_bar.connect(widget.update_status_bar)
     widget.worker_thread.update_progress.connect(widget.update_progress)
@@ -56,7 +58,7 @@ def start_metadata_removal(widget):
         return
 
     # Count the total number of image files
-    total_photos = sum([len(files) for r, d, files in os.walk(directory) if any(file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif')) for file in files)])
+    total_photos = sum([len(files) for r, d, files in os.walk(directory) if any(is_supported_image_file(file) for file in files)])
     widget.update_photo_counts(total_photos, total_photos)  # Update the photo counts
 
     # Initialize and start the image worker thread
@@ -76,7 +78,7 @@ def stop_all_image_operations(widget):
     if widget.worker_thread is not None:
         widget.worker_thread.stop()
 
-def start_video_processing(widget):
+def start_video_processing(widget, codec):
     """
     Start the video processing process.
     """
@@ -100,7 +102,7 @@ def start_video_processing(widget):
     widget.update_video_counts(total_videos, total_videos)  # Update the video counts
 
     # Initialize and start the video worker thread
-    widget.worker_thread = VideoWorkerThread(directory, use_gpu, use_handbrake, use_amd)
+    widget.worker_thread = VideoWorkerThread(directory, use_gpu, use_handbrake, use_amd, codec)
     widget.worker_thread.update_status.connect(widget.update_status)
     widget.worker_thread.update_status_bar.connect(widget.update_status_bar)
     widget.worker_thread.update_ffmpeg_output.connect(widget.update_ffmpeg_output)
@@ -108,7 +110,7 @@ def start_video_processing(widget):
     widget.worker_thread.update_remaining_videos.connect(lambda remaining: widget.update_video_counts(total_videos, remaining))
     widget.worker_thread.finished.connect(widget.on_finished)
     widget.worker_thread.start()
-    widget.status_bar.showMessage("Starting video processing...")
+    widget.status_bar.showMessage(f"Starting video processing to {codec.upper()}...")
 
 def stop_all_video_operations(widget):
     """

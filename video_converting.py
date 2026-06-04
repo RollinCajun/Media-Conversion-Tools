@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 from send2trash import send2trash
 from datetime import datetime
 from PySide6.QtCore import QThread, Signal
@@ -14,12 +15,13 @@ class VideoWorkerThread(QThread):
     update_remaining_videos = Signal(int)
     finished = Signal()
 
-    def __init__(self, directory, use_gpu, use_handbrake, use_amd):
+    def __init__(self, directory, use_gpu, use_handbrake, use_amd, codec):
         super().__init__()
         self.directory = sanitize_path(directory)  # Sanitize the directory path
         self.use_gpu = use_gpu  # Flag to use GPU for processing
         self.use_handbrake = use_handbrake  # Flag to use HandBrakeCLI
         self.use_amd = use_amd  # Flag to use AMD encoding
+        self.codec = codec  # Codec to use for conversion ('h265' or 'h264')
         self.stop_event = False  # Flag to stop the thread
         self.error_log_file = sanitize_path(os.path.join(directory, "error_log.txt"))  # Path to the error log file
 
@@ -40,9 +42,11 @@ class VideoWorkerThread(QThread):
         """
         Clean up any leftover temporary files in the directory.
         """
+        temp_suffixes = (".h265.mp4", ".h264.mp4", ".h265.mkv", ".h264.mkv", ".h265", ".h264")
         for root, _, files in os.walk(directory):
             for file in files:
-                if file.endswith(".h265.mp4"):
+                lower_name = file.lower()
+                if lower_name.endswith(temp_suffixes):
                     send2trash(sanitize_path(os.path.join(root, file)))
                     self.update_status_bar.emit(f"Moved leftover file to recycle bin: {file}")
 
@@ -57,16 +61,23 @@ class VideoWorkerThread(QThread):
             if self.stop_event:
                 break  # Stop processing if stop event is set
 
-            if not self.is_h265(file_path):
+            self.update_status_bar.emit(f"Checking file: {file_path}")  # Debug log
+            if self.needs_conversion(file_path, self.codec):
                 self.update_status_bar.emit(f"Processing {file_path}")
-                self.update_status_bar.emit(f"Converting {file_path} to H.265...")
                 try:
-                    if use_handbrake:
-                        self.convert_to_h265_handbrake(file_path, use_gpu, use_amd)  # Convert the video to H.265 using HandBrakeCLI
+                    if not self.is_correct_container(file_path):
+                        self.update_status_bar.emit(f"Remuxing {file_path} to correct MP4 container...")
+                        self.remux_to_mp4_container(file_path)
+                        self.rename_and_cleanup(file_path, 'remuxed')
+                        self.update_status.emit(f"{file_path} remuxed to correct MP4 container!")
                     else:
-                        self.convert_to_h265_ffmpeg(file_path, use_gpu, use_amd)  # Convert the video to H.265 using ffmpeg
-                    self.rename_and_cleanup(file_path)  # Rename and clean up the files
-                    self.update_status.emit(f"{file_path} converted to H.265!")
+                        self.update_status_bar.emit(f"Converting {file_path} to {self.codec.upper()}...")
+                        if use_handbrake:
+                            self.convert_with_handbrake(file_path, use_gpu, use_amd, self.codec)  # Convert the video using HandBrakeCLI
+                        else:
+                            self.convert_with_ffmpeg(file_path, use_gpu, use_amd, self.codec)  # Convert the video using ffmpeg
+                        self.rename_and_cleanup(file_path, self.codec)  # Rename and clean up the files
+                        self.update_status.emit(f"{file_path} converted to {self.codec.upper()}!")
                 except Exception as e:
                     self.log_error(file_path, e)  # Log any errors
                     self.update_status.emit(f"Error converting {file_path}: {e}")
@@ -75,7 +86,8 @@ class VideoWorkerThread(QThread):
                     final_file = sanitize_path(os.path.splitext(file_path)[0] + ".mp4")
                     os.rename(file_path, final_file)
                     self.update_status.emit(f"Renamed {file_path} to {final_file}")
-                self.update_status_bar.emit(f"Skipping {file_path}, already H.265")
+                self.update_status.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
+                self.update_status_bar.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
 
             self.update_ffmpeg_output.emit(f"Progress: {i + 1}/{total_files}")  # Update ffmpeg output
             self.update_progress.emit(int((i + 1) / total_files * 100))  # Update progress bar
@@ -89,88 +101,270 @@ class VideoWorkerThread(QThread):
         """
         return file.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.wmv'))
 
-    def is_h265(self, file_path):
+    def is_codec(self, file_path, codec):
         """
-        Check if the video file is encoded in H.265 format using ffprobe.
+        Check if the video file is encoded in the specified codec format using ffprobe.
         """
         try:
+            self.update_status_bar.emit(f"Checking codec for: {file_path}")  # Debug log
             result = subprocess.run(
                 [self.ffprobe_path, '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'default=nw=1:nk=1', file_path],
-                capture_output=True, text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW
+                capture_output=True, text=True, encoding='utf-8', errors='replace', check=True, creationflags=subprocess.CREATE_NO_WINDOW
             )
-            return 'hevc' in result.stdout
+            detected_codec = result.stdout.strip().lower()
+            self.update_status_bar.emit(f"Codec check result for {file_path}: {detected_codec}")  # Debug log
+            if codec == 'h265':
+                return detected_codec in ('hevc', 'h265')
+            if codec == 'h264':
+                return detected_codec == 'h264'
+            return False
         except FileNotFoundError as e:
             self.log_error(file_path, e)
             self.log_error(file_path, f"Environment PATH: {os.environ['PATH']}")
             raise e
         except subprocess.CalledProcessError as e:
             self.log_error(file_path, e)
-            raise e
+            self.log_error(file_path, f"ffprobe error output: {e.stderr}")
+            return False
+        except Exception as e:
+            self.log_error(file_path, e)
+            return False
 
-    def convert_to_h265_handbrake(self, file_path, use_gpu, use_amd):
+    def get_audio_codec(self, file_path):
         """
-        Convert the video file to H.265 format using HandBrakeCLI.
+        Return the codec name for the first audio stream in the file.
         """
-        output_file = sanitize_path(os.path.splitext(file_path)[0] + ".h265.mp4")
+        try:
+            result = subprocess.run(
+                [self.ffprobe_path, '-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'default=nw=1:nk=1', file_path],
+                capture_output=True, text=True, encoding='utf-8', errors='replace', check=True, creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            audio_codec = result.stdout.strip().lower()
+            if audio_codec:
+                self.update_status_bar.emit(f"Audio codec check result for {file_path}: {audio_codec}")
+                return audio_codec
+            return None
+        except subprocess.CalledProcessError as e:
+            self.update_status_bar.emit(f"Audio codec check failed for {file_path}: {e.stderr.strip()}")
+            return None
+        except Exception as e:
+            self.log_error(file_path, e)
+            return None
+
+    def is_default_audio(self, audio_codec):
+        """
+        Determine whether the audio codec is the default platform-compatible codec.
+        """
+        return audio_codec in ('aac', 'aac_latm')
+
+    def get_format_name(self, file_path):
+        """
+        Return the container format name (e.g., 'matroska', 'mov,mp4,m4a,3gp,3g2,mj2', etc.).
+        """
+        try:
+            result = subprocess.run(
+                [self.ffprobe_path, '-v', 'error', '-show_entries', 'format=format_name', '-of', 'default=nw=1:nk=1', file_path],
+                capture_output=True, text=True, encoding='utf-8', errors='replace', check=True, creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            format_name = result.stdout.strip().lower()
+            if format_name:
+                self.update_status_bar.emit(f"Format detected for {file_path}: {format_name}")
+                return format_name
+            return None
+        except subprocess.CalledProcessError:
+            return None
+        except Exception as e:
+            self.log_error(file_path, e)
+            return None
+
+    def is_correct_container(self, file_path):
+        """
+        Check if the file has the correct container format for its extension.
+        MP4 files should be in mov,mp4,m4a,3gp,3g2,mj2 format, not matroska.
+        """
+        if not file_path.lower().endswith('.mp4'):
+            return True
+
+        format_name = self.get_format_name(file_path)
+        if format_name is None:
+            return True
+
+        if 'matroska' in format_name:
+            self.update_status_bar.emit(f"File {file_path} has incorrect container (matroska in mp4), will remux to correct format")
+            return False
+
+        return True
+
+    def needs_conversion(self, file_path, codec):
+        """
+        Determine whether the video needs conversion because the video codec, audio codec, or container format is not compatible.
+        """
+        if not self.is_correct_container(file_path):
+            return True
+
+        if not self.is_codec(file_path, codec):
+            return True
+
+        audio_codec = self.get_audio_codec(file_path)
+        if audio_codec is None:
+            return False
+
+        if not self.is_default_audio(audio_codec):
+            self.update_status_bar.emit(f"Audio codec {audio_codec} is not default for {file_path}, converting audio to AAC")
+            return True
+
+        return False
+
+    def convert_with_handbrake(self, file_path, use_gpu, use_amd, codec):
+        """
+        Convert the video file to the specified codec format using HandBrakeCLI.
+        """
+        output_file = sanitize_path(os.path.splitext(file_path)[0] + f".{codec}.mp4")
         handbrake_cli_path = sanitize_path(os.path.join(os.path.dirname(__file__), "resources", "HandBrakeCLI.exe"))
+        encoder = 'x265' if codec == 'h265' else 'x264'
         if use_gpu:
             if use_amd:
-                command = [handbrake_cli_path, '-i', file_path, '-o', output_file, '--encoder', 'vce_h265', '--audio', '1,1', '--aencoder', 'copy', '--optimize', '--no-markers']
+                encoder = 'vce_h265' if codec == 'h265' else 'vce_h264'
             else:
-                command = [handbrake_cli_path, '-i', file_path, '-o', output_file, '--encoder', 'nvenc_h265', '--audio', '1,1', '--aencoder', 'copy', '--optimize', '--no-markers']
-        else:
-            command = [handbrake_cli_path, '-i', file_path, '-o', output_file, '--encoder', 'x265', '--audio', '1,1', '--aencoder', 'copy', '--optimize', '--no-markers']
+                encoder = 'nvenc_h265' if codec == 'h265' else 'nvenc_h264'
+        command = [handbrake_cli_path, '-i', file_path, '-o', output_file, '--encoder', encoder, '--audio', '1,1', '--aencoder', 'av_aac', '--optimize', '--no-markers']
 
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', creationflags=subprocess.CREATE_NO_WINDOW)
-        while True:
-            if self.stop_event:
-                process.terminate()
-                break
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                # Filter the output to include only specific lines or keywords
-                if any(keyword in output for keyword in ["Encoding", "Progress", "Complete"]):
-                    self.update_ffmpeg_output.emit(output.strip())
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            while True:
+                if self.stop_event:
+                    process.terminate()
+                    break
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    # Filter the output to include only specific lines or keywords
+                    if any(keyword in output for keyword in ["Encoding", "Progress", "Complete"]):
+                        self.update_ffmpeg_output.emit(output.strip())
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            process.wait()
 
-    def convert_to_h265_ffmpeg(self, file_path, use_gpu, use_amd):
+    def remux_to_mp4_container(self, file_path):
         """
-        Convert the video file to H.265 format using ffmpeg.
+        Remux video/audio streams to correct MP4 container without re-encoding.
         """
-        output_file = sanitize_path(os.path.splitext(file_path)[0] + ".h265.mp4")
-        if use_gpu:
-            if use_amd:
-                command = [self.ffmpeg_path, '-i', file_path, '-c:v', 'hevc_amf', '-c:a', 'copy', output_file]
+        output_file = sanitize_path(os.path.splitext(file_path)[0] + ".remuxed.mp4")
+        command = [
+            self.ffmpeg_path, '-i', file_path,
+            '-c:v', 'copy', '-c:a', 'copy', '-movflags', '+faststart', output_file
+        ]
+
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            while True:
+                if self.stop_event:
+                    process.terminate()
+                    break
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    if any(keyword in output for keyword in ["frame", "fps", "bitrate", "speed"]):
+                        self.update_ffmpeg_output.emit(output.strip())
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            process.wait()
+
+        if not os.path.exists(output_file):
+            raise FileNotFoundError(f"Remuxing failed: Output file not created for {file_path}")
+
+    def convert_with_ffmpeg(self, file_path, use_gpu, use_amd, codec):
+        """
+        Convert the video file to the specified codec format using ffmpeg.
+        """
+        output_file = sanitize_path(os.path.splitext(file_path)[0] + f".{codec}.mkv")
+        if codec == 'h265':
+            if use_gpu:
+                encoder = 'hevc_nvenc'
+                command = [
+                    self.ffmpeg_path, '-hwaccel', 'cuda', '-i', file_path,
+                    '-c:v', encoder, '-preset', 'medium', '-cq', '23', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', output_file
+                ]
             else:
-                command = [self.ffmpeg_path, '-i', file_path, '-c:v', 'hevc_nvenc', '-c:a', 'copy', output_file]
-        else:
-            command = [self.ffmpeg_path, '-i', file_path, '-c:v', 'libx265', '-c:a', 'copy', output_file]
+                encoder = 'libx265'
+                command = [
+                    self.ffmpeg_path, '-i', file_path,
+                    '-c:v', encoder, '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', output_file
+                ]
+        else:  # codec == 'h264'
+            if use_gpu:
+                encoder = 'h264_nvenc'
+                command = [
+                    self.ffmpeg_path, '-hwaccel', 'cuda', '-i', file_path,
+                    '-c:v', encoder, '-preset', 'medium', '-cq', '23', '-c:a', 'aac', '-b:a', '192k', output_file
+                ]
+            else:
+                encoder = 'libx264'
+                command = [
+                    self.ffmpeg_path, '-i', file_path,
+                    '-c:v', encoder, '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-b:a', '192k', output_file
+                ]
 
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', creationflags=subprocess.CREATE_NO_WINDOW)
-        while True:
-            if self.stop_event:
-                process.terminate()
-                break
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                # Filter the output to include only specific lines or keywords
-                if any(keyword in output for keyword in ["frame", "fps", "bitrate", "speed"]):
-                    self.update_ffmpeg_output.emit(output.strip())
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            while True:
+                if self.stop_event:
+                    process.terminate()
+                    break
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    # Filter the output to include only specific lines or keywords
+                    if any(keyword in output for keyword in ["frame", "fps", "bitrate", "speed"]):
+                        self.update_ffmpeg_output.emit(output.strip())
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            process.wait()
 
-    def rename_and_cleanup(self, file_path):
+        # Verify if the output file was created
+        if not os.path.exists(output_file):
+            raise FileNotFoundError(f"Conversion failed: Output file not created for {file_path}")
+
+    def rename_and_cleanup(self, file_path, codec):
         """
-        Rename the converted file and move the original file to the recycle bin.
+        Remove the original file, then rename the converted file to the original file name.
         """
         old_file = sanitize_path(file_path)
-        new_file = sanitize_path(os.path.splitext(file_path)[0] + ".h265.mp4")
+        if codec == 'remuxed':
+            converted_candidate_mkv = None
+            converted_candidate_mp4 = sanitize_path(os.path.splitext(file_path)[0] + ".remuxed.mp4")
+        else:
+            converted_candidate_mkv = sanitize_path(os.path.splitext(file_path)[0] + f".{codec}.mkv")
+            converted_candidate_mp4 = sanitize_path(os.path.splitext(file_path)[0] + f".{codec}.mp4")
         final_file = sanitize_path(os.path.splitext(file_path)[0] + ".mp4")
 
-        if os.path.exists(new_file):
-            send2trash(old_file)
-            os.rename(new_file, final_file)
+        if converted_candidate_mkv and os.path.exists(converted_candidate_mkv):
+            new_file = converted_candidate_mkv
+        elif os.path.exists(converted_candidate_mp4):
+            new_file = converted_candidate_mp4
+        else:
+            self.update_status.emit(f"Error: Converted file not found for {file_path}. Skipping cleanup.")
+            return
+
+        if os.path.exists(old_file):
+            for attempt in range(5):
+                try:
+                    send2trash(old_file)
+                    self.update_status_bar.emit(f"Moved original to recycle bin: {old_file}")
+                    break
+                except OSError as e:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.2)
+
+        os.replace(new_file, final_file)
+        self.update_status_bar.emit(f"Converted and renamed {new_file} to {final_file}")
 
     def log_error(self, file_path, error):
         """

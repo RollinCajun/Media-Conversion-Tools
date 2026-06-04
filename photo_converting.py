@@ -12,7 +12,7 @@ import concurrent.futures
 from PIL import Image
 from send2trash import send2trash
 from PySide6.QtCore import QThread, Signal
-from utils import sanitize_path, convert_single_image, remove_single_metadata
+from utils import sanitize_path, convert_single_image, remove_single_metadata, is_supported_image_file
 
 class ImageWorkerThread(QThread):
     # Signals to update the UI
@@ -22,11 +22,12 @@ class ImageWorkerThread(QThread):
     update_remaining_photos = Signal(int)
     finished = Signal()
 
-    def __init__(self, directory, use_max_cores, task):
+    def __init__(self, directory, use_max_cores, task, target_format='JPG'):
         super().__init__()
         self.directory = sanitize_path(directory)  # Sanitize the directory path
         self.use_max_cores = use_max_cores  # Flag to use maximum CPU cores
         self.task = task  # Task to perform: 'convert' or 'remove_metadata'
+        self.target_format = target_format
         self.stop_event = False  # Flag to stop the thread
 
     def run(self):
@@ -43,33 +44,36 @@ class ImageWorkerThread(QThread):
     def convert_to_jpg(self, directory, use_max_cores):
         start_time = time.time()  # Record start time
         # Collect all image files in the directory and subdirectories
-        files_to_process = [os.path.join(root, file) for root, _, files in os.walk(directory) for file in files if file.lower().endswith(('.jpeg', '.png', '.gif', '.tiff', '.bmp', '.jpg', '.heic'))]
+        files_to_process = [os.path.join(root, file) for root, _, files in os.walk(directory) for file in files if is_supported_image_file(file)]
+        print(f"Files to process: {files_to_process}")  # Debugging line
         total_files = len(files_to_process)  # Total number of files to process
+        if total_files == 0:
+            self.update_status.emit("No files found to process.")
+            return
         max_workers = os.cpu_count() if use_max_cores else 2  # Determine number of workers
 
         # Use a ThreadPoolExecutor to process files concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(convert_single_image, file_path): file_path for file_path in files_to_process}
+            futures = {executor.submit(convert_single_image, file_path, self.target_format): file_path for file_path in files_to_process}
             for i, future in enumerate(concurrent.futures.as_completed(futures)):
                 if self.stop_event:
                     break  # Stop processing if stop event is set
                 try:
                     result = future.result()  # Get the result of the future
+                    print(f"Processing result: {result}")  # Debugging line
                     if "Skipping" in result:
                         self.update_status_bar.emit(result)  # Update status bar if skipping
                     else:
-                        original_file = futures[future]  # Get the original file path
                         new_file = result  # Get the new file path
+                        print(f"New file: {new_file}")  # Debugging line
                         if os.path.exists(new_file):
-                            send2trash(original_file)  # Move original file to recycle bin
-                            final_file = os.path.splitext(original_file)[0] + ".jpg"  # Determine final file path
-                            os.rename(new_file, final_file)  # Rename new file to final file
-                            self.update_status.emit(f"Completed: {final_file}")  # Update status
+                            self.update_status.emit(f"Completed: {new_file}")  # Update status
                         else:
-                            self.update_status_bar.emit(f"Error: New file does not exist for {original_file}")
+                            self.update_status_bar.emit(f"Error: New file does not exist for {new_file}")
                     self.update_progress.emit(int((i + 1) / total_files * 100))  # Update progress bar
                     self.update_remaining_photos.emit(total_files - (i + 1))  # Update remaining photos count
                 except Exception as exc:
+                    print(f"Error processing file: {futures[future]} - {exc}")  # Debugging line
                     self.update_status_bar.emit(f"Error: {exc}")  # Update status bar with error
 
         end_time = time.time()  # Record end time

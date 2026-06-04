@@ -11,17 +11,22 @@ Media Conversion Tools: A GUI application for efficient media file conversion
 
 ### Video Conversion
 - Scans specified folders and subfolders recursively.
-- Converts all video files found from any format to the H.265 format using the MP4 container.
+- Converts all video files found to H.265 or H.264 format using the MP4 container.
+- **Audio Codec Detection & Conversion:** Automatically detects non-default audio codecs (e.g., Opus) and converts them to AAC, ensuring compatibility with all social media platforms.
+- **Container Format Validation & Remuxing:** Detects and fixes files labeled as MP4 that incorrectly contain MKV containers, remuxing them to proper MP4 containers without re-encoding.
 - Supports GPU encoding (NVIDIA and AMD) and CPU encoding.
 - Allows the use of HandBrakeCLI or ffmpeg for video conversion.
+- Original files are safely moved to the recycle bin upon successful conversion.
 
 ### Image Conversion & Metadata Removal
 - Scans specified folders and subfolders recursively.
 - Converts all image files to the JPEG format.
 - Adds a custom comment to the metadata of converted images to keep track of files already converted, allowing you to stop and resume the application as needed. After converting all image files you can use the Remove Metadata button to clear the comment off all files.
 - Removes metadata from the "Description" section of the image files.
+- Original image files are safely moved to the recycle bin upon successful conversion or metadata removal.
 
-#### Files are sent to the recycling bin mainly for debugging purposes while creating this application to ensure I didn't lose anything important. This part of the code could be changed to permanently delete the files if you wish. Using the recycling bin was the safest method while creating this application. If you decide to delete the files permanently you can remove the `send2trash` library from the application altogether.
+#### File Safety
+All original files (both videos and images) are moved to the recycle bin upon successful conversion or processing, allowing for easy recovery if needed. This ensures data safety and gives you the ability to verify the output before permanently deleting the originals.
 
 ## Inspiration for creating this Application
 After downloading a large collection of media files, I used up too much space on my hard drive, so I needed a way to save space without deleting anything. By converting videos to H.265 and images to JPEG, I reduced the space taken by almost half. For example, a 500 MB video file can be reduced to around 200-250 MB. This application helped reduce over 1 TB of data to 558 GB, saving over 400 GB of storage space. H.265 has become extremely popular and is by far the best-compressed video format that still holds extremely good details without losing much quality.
@@ -137,10 +142,10 @@ app.setStyle("Fusion")
 - **Enable GPU Encoding (Unchecked = CPU):** Enable this option to use NVIDIA GPU encoding for video processing. When unchecked, CPU encoding is used.
 - **Enable AMD Encoding (Unchecked = NVIDIA):** Enable this option to use AMD instead of NVIDIA encoding for video processing. When unchecked, NVIDIA encoding is used.
 - **Use HandBrake CLI (Unchecked = ffmpeg):** Enable this option to use HandBrake CLI instead of ffmpeg for video processing. When unchecked, ffmpeg is used.
-- **Convert All Videos to h.265:** Start converting all videos in the directory to H.265 format.
+- **Convert All Videos to h.265/h.264:** Start converting all videos in the directory to H.265 or H.264 format with automatic audio codec detection and container format validation.
 - **Stop All:** Stop all ongoing video processing operations.
-- **Log Text Box:** Displays the log messages for video processing operations.
-- **ffmpeg Output Text Box:** Displays the output messages from ffmpeg during video processing.
+- **Log Text Box:** Displays the log messages for video processing operations, including codec detection and container format issues.
+- **ffmpeg Output Text Box:** Displays the output messages from ffmpeg/HandBrake during video processing.
 - **Total Videos:** Displays the total number of videos to be processed.
 - **Remaining Videos:** Displays the number of videos remaining to be processed.
 - **Status Bar:** Displays the current status of the video processing operations.

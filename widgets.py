@@ -9,6 +9,7 @@ This module contains the GUI widgets for image and video processing using PySide
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QFileDialog, QTextEdit, QCheckBox, 
                                QProgressBar, QMessageBox, QStatusBar)
+from PySide6.QtWidgets import QComboBox
 from PySide6.QtCore import Qt
 from handlers import (browse_directory, start_image_conversion, start_metadata_removal, 
                       stop_all_image_operations, start_video_processing, stop_all_video_operations)
@@ -39,10 +40,19 @@ class ImageProcessingWidget(QWidget):
         self.use_max_cores_checkbox = QCheckBox("Use Max CPU Cores")
         self.use_max_cores_checkbox.setToolTip("Enable this option to use the maximum number of CPU cores for processing.")
 
+        # Output format selector
+        format_layout = QHBoxLayout()
+        format_label = QLabel("Output Format:")
+        self.format_selector = QComboBox()
+        self.format_selector.addItems(["JPG", "PNG"])  # Default JPG
+        self.format_selector.setToolTip("Select output image format for converted files.")
+        format_layout.addWidget(format_label)
+        format_layout.addWidget(self.format_selector)
+
         # Buttons for conversion and metadata removal
         button_layout = QHBoxLayout()
-        convert_button = QPushButton("Convert to JPG and Add Comment")
-        convert_button.setToolTip("Convert all images in the directory to JPG format and add a comment to the metadata.")
+        convert_button = QPushButton("Convert Images")
+        convert_button.setToolTip("Convert all images in the directory to the selected format. If JPG is selected, a comment will be added to metadata to mark converted files.")
         convert_button.clicked.connect(lambda: start_image_conversion(self))
         remove_metadata_button = QPushButton("Remove All Metadata")
         remove_metadata_button.setToolTip("Remove all metadata from the images in the directory.")
@@ -76,6 +86,7 @@ class ImageProcessingWidget(QWidget):
 
         layout.addLayout(dir_layout)
         layout.addWidget(self.use_max_cores_checkbox)
+        layout.addLayout(format_layout)
         layout.addLayout(button_layout)
         layout.addLayout(count_layout)
         layout.addWidget(self.log_text)
@@ -151,11 +162,15 @@ class VideoProcessingWidget(QWidget):
         button_layout = QHBoxLayout()
         process_button = QPushButton("Convert All Videos to h.265")
         process_button.setToolTip("Start converting all videos in the directory to H.265 format.")
-        process_button.clicked.connect(lambda: start_video_processing(self))
+        process_button.clicked.connect(lambda: start_video_processing(self, 'h265'))
+        process_h264_button = QPushButton("Convert All Videos to h.264")
+        process_h264_button.setToolTip("Start converting all videos in the directory to H.264 format.")
+        process_h264_button.clicked.connect(lambda: start_video_processing(self, 'h264'))
         stop_button = QPushButton("Stop All")
         stop_button.setToolTip("Stop all ongoing video processing operations.")
         stop_button.clicked.connect(lambda: stop_all_video_operations(self))
         button_layout.addWidget(process_button)
+        button_layout.addWidget(process_h264_button)
         button_layout.addWidget(stop_button)
 
         # Video count labels
