@@ -70,24 +70,31 @@ class VideoWorkerThread(QThread):
                         self.remux_to_mp4_container(file_path)
                         self.rename_and_cleanup(file_path, 'remuxed')
                         self.update_status.emit(f"{file_path} remuxed to correct MP4 container!")
-                    else:
+                        file_path = sanitize_path(os.path.splitext(file_path)[0] + ".mp4")
+
+                    if self.needs_conversion(file_path, self.codec):
                         self.update_status_bar.emit(f"Converting {file_path} to {self.codec.upper()}...")
                         if use_handbrake:
-                            self.convert_with_handbrake(file_path, use_gpu, use_amd, self.codec)  # Convert the video using HandBrakeCLI
+                            self.convert_with_handbrake(file_path, use_gpu, use_amd, self.codec)
                         else:
-                            self.convert_with_ffmpeg(file_path, use_gpu, use_amd, self.codec)  # Convert the video using ffmpeg
-                        self.rename_and_cleanup(file_path, self.codec)  # Rename and clean up the files
+                            self.convert_with_ffmpeg(file_path, use_gpu, use_amd, self.codec)
+                        self.rename_and_cleanup(file_path, self.codec)
                         self.update_status.emit(f"{file_path} converted to {self.codec.upper()}!")
+                    else:
+                        self.update_status.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
+                        self.update_status_bar.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
                 except Exception as e:
                     self.log_error(file_path, e)  # Log any errors
                     self.update_status.emit(f"Error converting {file_path}: {e}")
             else:
                 if not file_path.lower().endswith('.mp4'):
-                    final_file = sanitize_path(os.path.splitext(file_path)[0] + ".mp4")
-                    os.rename(file_path, final_file)
-                    self.update_status.emit(f"Renamed {file_path} to {final_file}")
-                self.update_status.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
-                self.update_status_bar.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
+                    self.update_status_bar.emit(f"Remuxing {file_path} to correct MP4 container without re-encoding...")
+                    self.remux_to_mp4_container(file_path)
+                    self.rename_and_cleanup(file_path, 'remuxed')
+                    self.update_status.emit(f"{file_path} remuxed to correct MP4 container!")
+                else:
+                    self.update_status.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
+                    self.update_status_bar.emit(f"Skipping {file_path}, already {self.codec.upper()} with compatible audio")
 
             self.update_ffmpeg_output.emit(f"Progress: {i + 1}/{total_files}")  # Update ffmpeg output
             self.update_progress.emit(int((i + 1) / total_files * 100))  # Update progress bar
@@ -281,7 +288,7 @@ class VideoWorkerThread(QThread):
         """
         Convert the video file to the specified codec format using ffmpeg.
         """
-        output_file = sanitize_path(os.path.splitext(file_path)[0] + f".{codec}.mkv")
+        output_file = sanitize_path(os.path.splitext(file_path)[0] + f".{codec}.mp4")
         if codec == 'h265':
             if use_gpu:
                 encoder = 'hevc_nvenc'
@@ -300,13 +307,13 @@ class VideoWorkerThread(QThread):
                 encoder = 'h264_nvenc'
                 command = [
                     self.ffmpeg_path, '-hwaccel', 'cuda', '-i', file_path,
-                    '-c:v', encoder, '-preset', 'medium', '-cq', '23', '-c:a', 'aac', '-b:a', '192k', output_file
+                    '-c:v', encoder, '-preset', 'medium', '-cq', '23', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', output_file
                 ]
             else:
                 encoder = 'libx264'
                 command = [
                     self.ffmpeg_path, '-i', file_path,
-                    '-c:v', encoder, '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-b:a', '192k', output_file
+                    '-c:v', encoder, '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', output_file
                 ]
 
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', creationflags=subprocess.CREATE_NO_WINDOW)
